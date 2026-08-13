@@ -17,7 +17,9 @@ interface ConversationStore {
     id: string
     name: string
   }[]
-  addConversation: (name: string) => void
+  /** Returns the new conversation's id so the caller can select it. */
+  addConversation: (name: string) => string
+  renameConversation: (id: string, name: string) => void
 }
 
 interface SelectedConversationStore {
@@ -47,11 +49,14 @@ export const useChatStore = create<ChatStore>((set) => ({
 
 export const useConversationStore = create<ConversationStore>((set) => ({
   conversations: [],
-  addConversation: (name: string) => set((c) => ({
-    conversations: [...c.conversations, {
-      id: crypto.randomUUID(),
-      name
-    }]}))
+  addConversation: (name: string) => {
+    const id = crypto.randomUUID();
+    set((c) => ({ conversations: [...c.conversations, { id, name }] }));
+    return id;
+  },
+  renameConversation: (id, name) => set((c) => ({
+    conversations: c.conversations.map((con) => con.id === id ? { ...con, name } : con)
+  }))
 }))
 
 export const useCurrentConversation = create<SelectedConversationStore>((set) => ({

@@ -26,13 +26,14 @@ function Conversation({title, description}: ConversationProps) {
 export default function Conversations() {
   const conversations = useConversationStore(s => s.conversations)
   const addConversation = useConversationStore(s => s.addConversation)
+  const setCurrentConversation = useCurrentConversation(s => s.setConversationId)
 
   return (
     <div className="w-full flex flex-col min-h-0">
       <div className="p-3.5">
         <button
           className="w-full flex items-center justify-center gap-2 h-[38px] rounded-[9px] border border-line-strong bg-white text-[13.5px] font-medium text-ink cursor-pointer transition-colors hover:bg-hover hover:border-[#c9c4bb]"
-          onClick={() => addConversation(Date.now().toLocaleString())}>
+          onClick={() => setCurrentConversation(addConversation("New conversation"))}>
           <span className="text-base leading-none -mt-px">+</span>
           New conversation
         </button>

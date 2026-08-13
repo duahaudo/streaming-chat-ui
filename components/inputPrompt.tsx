@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useChatStore, useCurrentConversation } from "@/lib/store";
+import { 
+  useChatStore, 
+  useConversationStore, 
+  useCurrentConversation 
+} from "@/lib/store";
+import { generateTitle, streamChat } from "@/lib/api";
 
 interface InputPromptProps {
   className?: string;
@@ -12,12 +17,27 @@ export default function InputPrompt({ className }: InputPromptProps) {
   const [streaming, setStreaming] = useState(false);
   const addMessage = useChatStore((s) => s.addMessage);
   const appendToLast = useChatStore((s) => s.appendToLast);
-  const conversationId = useCurrentConversation((s) => s.conversationId as string)
+  const currentConversationId = useCurrentConversation((s) => s.conversationId)
+  const setConversationId = useCurrentConversation((s) => s.setConversationId);
+  const addConversation = useConversationStore((s) => s.addConversation);
+  const renameConversation = useConversationStore((s) => s.renameConversation);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = message.trim();
     if (!text || streaming) return;
+
+    // Sending with nothing selected starts a conversation instead of orphaning the message.
+    let conversationId = currentConversationId;
+    if (!conversationId) {
+      conversationId = addConversation("New conversation");
+      setConversationId(conversationId);
+    }
+
+    const isFirstMessage = !useChatStore
+      .getState()
+      .messages.some((m) => m.conversationId === conversationId);
+
     addMessage({
       message: text,
       sender: "user",
@@ -26,22 +46,27 @@ export default function InputPrompt({ className }: InputPromptProps) {
     setMessage("");
     setStreaming(true);
 
+    // Read after the user message lands, before the empty assistant placeholder is added.
+    const history = useChatStore
+      .getState()
+      .messages.filter((m) => m.conversationId === conversationId && m.message)
+      .map((m) => ({ role: m.sender, content: m.message }));
+
+    if (isFirstMessage) {
+      generateTitle(text)
+        .then((title) => title && renameConversation(conversationId, title))
+        .catch(() => {}); // a missing title must not break the reply
+    }
+
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        body: JSON.stringify({ message: text }),
-      });
       addMessage({
         message: "",
         sender: "assistant",
         timestamp: new Date().toLocaleTimeString(),
       }, conversationId);
 
-      const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        appendToLast(value, conversationId);
+      for await (const chunk of streamChat(history)) {
+        appendToLast(chunk, conversationId);
       }
     } finally {
       setStreaming(false);

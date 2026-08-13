@@ -3,37 +3,29 @@
 Token-by-token chat streaming, with abort mid-stream, retry, and error recovery
 as first-class states instead of afterthoughts.
 
-**Stack:** Next.js (App Router) · TypeScript · Tailwind · MSW
+**Stack:** Next.js (App Router) · TypeScript · Tailwind
 
 One screen. No database. No accounts. The conversation lives in the browser only —
 reload and it is gone.
 
-## Two backends
+## Backend
 
-| Environment | Backend |
-| --- | --- |
-| Local (`npm run dev`) | MSW service worker mocks the streaming endpoint |
-| Production | Next.js route handler → OpenRouter, DeepSeek V4 Flash (free tier) |
+One backend, everywhere: the Next.js route handler at `app/api/chat/route.ts` calls
+OpenRouter (DeepSeek V4 Flash, free tier) and streams the reply back.
 
-**Why mock locally at the network boundary:** every failure mode — a 429, a stream
-that dies at token 20, a corrupted SSE frame split across chunk boundaries — is
-reproducible on demand. That is what makes the error handling demonstrable rather
-than claimed. The same handlers can be reused by `setupServer` in tests.
+**Why a real provider, not a mock:** the transport gets proven against a live SSE
+stream, not against a fake written to match the client.
 
-**Why a real provider in production:** the transport gets proven against a live SSE
-stream, not only against a mock written to match the client.
-
-**The API key never reaches the browser.** `app/api/chat/route.ts` holds it, calls
+**The API key never reaches the browser.** The route handler holds it, calls
 OpenRouter server-side, and pipes the upstream `ReadableStream` straight back to the
 client without buffering. The browser only ever talks to a same-origin `POST
-/api/chat` — the same URL MSW intercepts locally, so the client code is identical in
-both environments.
+/api/chat`.
 
 ## Getting started
 
 ```bash
 npm install
-npm run dev          # http://localhost:3000 — MSW mocks the backend, no key needed
+npm run dev          # http://localhost:3000 — needs OPENROUTER_API_KEY in .env.local
 ```
 
 Production build:
@@ -53,25 +45,6 @@ OPENROUTER_MODEL=deepseek/deepseek-v4-flash:free
 needs a runtime (Vercel, Cloudflare Pages via `@cloudflare/next-on-pages`, or any
 Node host). A static export would be one less moving part, but the only way to keep
 the key off the client is to have something server-side holding it.
-
-## Scenarios
-
-Handlers are swapped at runtime with `worker.resetHandlers()` + `worker.use(...)` —
-no rebuild. Pick one from the control panel, or share a broken state as a link with
-`?scenario=<id>`.
-
-| id | behaviour |
-| --- | --- |
-| `happy` | ~30 tok/s |
-| `slow` | 2 tok/s — easiest way to catch a mid-stream screenshot |
-| `drop-at-20` | `controller.error()` after 20 tokens |
-| `http-429` | 429 + `Retry-After: 3`, before any bytes |
-| `http-500` | 500 before the first token |
-| `malformed` | corrupt `data:` line, split across chunks |
-| `no-first-byte` | headers, then silence — client timeout |
-| `truncated` | stream ends with no terminal event |
-
-Scenarios are local-only; production talks to the real provider.
 
 ## Decisions
 
@@ -101,22 +74,13 @@ fence mid-stream does not corrupt the view.
 on completion rather than per token. Stick-to-bottom scrolling that releases as soon
 as the user scrolls up.
 
-**MSW start is a gate, not a side effect.** `worker.start()` is async; a fetch that
-fires before the worker claims the client hits the real network and 404s on a static
-host. Rendering waits behind it, with a skeleton until it resolves. If `start()`
-fails — Firefox private windows, insecure contexts, corporate policy — the app falls
-back to an in-process transport returning the same `ReadableStream`, and a banner
-names the active mode.
-
 ## Layout
 
 ```
 app/            layout, page
 app/api/chat/   route handler — holds the key, proxies OpenRouter, pipes the stream
-components/     MockProvider (start gate), ScenarioPanel
-lib/transport/  sseParser, streamClient, errors
-mocks/          handlers/, scenarios/, browser.ts, server.ts
-public/         mockServiceWorker.js
+components/     message bubble, composer, transcript, sidebar
+lib/            api.ts (streaming client), store.ts (zustand)
 ```
 
 Spec: [Demo 1 — Streaming chat UI](https://docs.google.com/document/d/19KKkTM-GDuJmrX_AKSlnRkEo_Xz64Letp_oPGKJMKdE/edit)
