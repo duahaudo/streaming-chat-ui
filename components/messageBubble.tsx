@@ -2,9 +2,10 @@ export interface MessageBubbleProps {
   message: string;
   sender: "user" | "assistant";
   timestamp: string;
+  status?: "stopped" | "error";
 }
 
-export default function MessageBubble({message, sender, timestamp}: MessageBubbleProps) {
+export default function MessageBubble({message, sender, timestamp, status}: MessageBubbleProps) {
   if (sender === "user") {
     return (
       <div className="flex justify-end">
@@ -24,7 +25,11 @@ export default function MessageBubble({message, sender, timestamp}: MessageBubbl
         <div className="bg-surface border border-line px-[15px] py-[11px] rounded-[4px_14px_14px_14px] text-[14.5px] leading-[1.6] whitespace-pre-wrap text-ink-soft">
           {message}
         </div>
-        <div className="font-mono text-[10.5px] text-faint pl-0.5">{timestamp}</div>
+        <div className="font-mono text-[10.5px] text-faint pl-0.5">
+          {timestamp}
+          {status === "stopped" && " · stopped"}
+          {status === "error" && " · failed"}
+        </div>
       </div>
     </div>
   );

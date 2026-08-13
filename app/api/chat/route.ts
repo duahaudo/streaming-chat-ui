@@ -46,7 +46,12 @@ export async function POST(request: Request) {
   });
 
   if (!upstream.ok || !upstream.body) {
-    return new Response(await upstream.text(), { status: upstream.status });
+    // Retry-After has to survive the hop, otherwise the client guesses the backoff on a 429.
+    const retryAfter = upstream.headers.get("Retry-After");
+    return new Response(await upstream.text(), {
+      status: upstream.status,
+      headers: retryAfter ? { "Retry-After": retryAfter } : undefined,
+    });
   }
 
   return new Response(
