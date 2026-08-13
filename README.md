@@ -1,7 +1,9 @@
-# Demo 1 — Streaming chat UI
+# Streaming chat UI
 
 Token-by-token chat streaming, with abort mid-stream, retry, and error recovery
 as first-class states instead of afterthoughts.
+
+**Live demo:** https://streaming-chat-ui.vercel.app/
 
 **Stack:** Next.js (App Router) · TypeScript · Tailwind
 
@@ -65,15 +67,6 @@ retry with exponential backoff plus jitter. Failed at token 400 → the user dec
 discard partial or resume from partial. No auto-retry on 4xx; a 429 waits out
 `Retry-After`.
 
-**Rendering batches into `requestAnimationFrame`.** Re-parsing the markdown tree per
-token is the obvious way to make a fast stream feel slow. The streaming tail renders
-as plain text and markdown is re-parsed at chunk boundaries only, so an unclosed code
-fence mid-stream does not corrupt the view.
-
-**Accessibility and scroll.** `aria-live="polite"` on the assistant region, announced
-on completion rather than per token. Stick-to-bottom scrolling that releases as soon
-as the user scrolls up.
-
 ## Layout
 
 ```
@@ -82,5 +75,3 @@ app/api/chat/   route handler — holds the key, proxies OpenRouter, pipes the s
 components/     message bubble, composer, transcript, sidebar
 lib/            api.ts (streaming client), store.ts (zustand)
 ```
-
-Spec: [Demo 1 — Streaming chat UI](https://docs.google.com/document/d/19KKkTM-GDuJmrX_AKSlnRkEo_Xz64Letp_oPGKJMKdE/edit)
